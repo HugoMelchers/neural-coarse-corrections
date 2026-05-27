@@ -14,14 +14,11 @@ from ..utils.misc import relative_errors, nr_params
 from ..utils.quadrature import get_quadrature
 
 
-def test_models(data, table_fmt="markdown", loss_smoothing=10, boxplot=True, density_plot=True):
+def test_models(data, table_fmt="markdown", loss_smoothing=10, boxplot=False, density_plot=False):
     load_results(data)
     add_errors(data)
     add_error_stats(data, keys="all")
     print_error_table(data, table_fmt)
-
-    plot_history(data, loss_smoothing)
-    plot_history(data, loss_smoothing, xlog=True)
 
     plot_separate_histories(data, smoothing=loss_smoothing)
     plot_separate_histories(data, smoothing=loss_smoothing, xlog=True)
