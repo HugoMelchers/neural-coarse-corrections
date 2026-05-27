@@ -1,7 +1,5 @@
 # Neural Operators for Preconditioning
 
-NOTE: this repository is still under construction.
-
 This project contains the code associated with the paper on neural operators as coarse-space corrections in two-level preconditioners: <http://arxiv.org/abs/2605.19867>. It is structured as follows:
 
 - `src/` the folder containing the source code
@@ -99,4 +97,24 @@ The results are stored in the `output/` folder, which will look as follows if al
 
 # Running the preconditioners
 
-Use the scripts in the folder `scripts/preconditioning` to evaluate the trained neural operators as preconditioners.
+Use the scripts in the folder `scripts/preconditioning` to evaluate the trained neural operators as preconditioners. For example:
+
+```bash
+python -m scripts.preconditioning.diffusion-dataset-3
+```
+
+Note that some of these scripts take a long time to run (especially the DeepONet-based preconditioners which often take very long). To obtain partial data, it is possible to
+
+- Comment out some of the entries in `ns_tols` to skip fine meshes
+- Remove some entries from the `models` list to skip e.g. the DeepONet
+- Replace the data set range, i.e. replace `advdiff:9000-10000` by `advdiff:9000-9100` to only run on 100 test problems instead of 1000
+
+# Creating the plots
+
+All the plots in the arXiv paper can be created by running the scripts in the `plotting` folder. For example:
+
+```bash
+python -m scripts.plotting.diffusion-precbars
+```
+
+Note since PyPlot's `savefig` doesn't create subfolders that the `plots` directory exists and has subfolders `diffusion`, `advdiff`, and `helmholtz`.

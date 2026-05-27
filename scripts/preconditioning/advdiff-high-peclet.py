@@ -4,10 +4,10 @@ import warnings
 
 from src.preconditioning.test_preconditioning import test_preconditioning
 
-data = "advdiff-high-peclet:9000-9001"
+data = "advdiff-high-peclet:9000-10000"
 
-precs = ["A-DEF1"]
-Ms = ["gs4"]
+prec = "A-DEF1"
+M = "gs4"
 ns_tols = [
     (20, 2.56e-4),
     (40, 6.4e-5),
@@ -40,12 +40,8 @@ defaults = {
     "pe_max": 60.0,
 }
 
-with_none = True
-with_ichol = True
-with_exact = True
-with_inexact = True
 save_results = True
-subfolder = "with-gs4"
+subfolder = None
 
 
 def add_cfg(model_path, exact, kind, M, grid, tol, filename):
@@ -72,28 +68,22 @@ for lowtol in [False, True]:
             tol = 1e-10
             lt = "-lowtol"
 
-        if with_none:
-            # No preconditioning
-            filename = f"{dataname}/{solver}/n{n}/noprec{lt}"
-            add_cfg(refmodel, True, "PREC", None, (n + 1, n + 1), tol, filename)
+        # No preconditioning
+        filename = f"{dataname}/{solver}/n{n}/noprec{lt}"
+        add_cfg(refmodel, True, "PREC", None, (n + 1, n + 1), tol, filename)
 
-        for M in Ms:
-            if with_ichol:
-                # Only preconditioning with M⁻¹
-                filename = f"{dataname}/{solver}/n{n}/{M}{lt}"
-                add_cfg(refmodel, True, "PREC", M, (n + 1, n + 1), tol, filename)
+        # Only preconditioning with M⁻¹
+        filename = f"{dataname}/{solver}/n{n}/{M}{lt}"
+        add_cfg(refmodel, True, "PREC", M, (n + 1, n + 1), tol, filename)
 
-            for prec in precs:
-                if with_exact:
-                    # Exact preconditioning
-                    filename = f"{dataname}/{solver}/n{n}/{prec}-{M}{lt}"
-                    add_cfg(refmodel, True, prec, M, (n + 1, n + 1), tol, filename)
+        # Exact preconditioning
+        filename = f"{dataname}/{solver}/n{n}/{prec}-{M}{lt}"
+        add_cfg(refmodel, True, prec, M, (n + 1, n + 1), tol, filename)
 
-                if with_inexact:
-                    for model in models:
-                        # Inexact preconditioning
-                        filename = f"{dataname}/{solver}/n{n}/{prec}-{M}{lt}"
-                        add_cfg(model, False, prec, M, (n + 1, n + 1), tol, filename)
+        for model in models:
+            # Inexact preconditioning
+            filename = f"{dataname}/{solver}/n{n}/{prec}-{M}{lt}"
+            add_cfg(model, False, prec, M, (n + 1, n + 1), tol, filename)
 
 if subfolder is not None:
     for config in configs:
