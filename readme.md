@@ -17,7 +17,7 @@ This project contains the code associated with the paper on neural operators as 
 
 # Installation
 
-1. Download the source code: `git clone git@github.com:HugoMelchers/neural-coarse-corrections.git`. This library is known to work with Python 3.11. I recommend [PyEnv](https://github.com/pyenv/pyenv) to manage installed versions of Python.
+1. Download the source code: `git clone git@github.com:HugoMelchers/neural-coarse-corrections.git`. This library is known to work with Python 3.12. I recommend [PyEnv](https://github.com/pyenv/pyenv) to manage installed versions of Python.
 2. Create a virtual environment and install the dependencies with `pip`:
     ```bash
     cd neural-coarse-corrections
