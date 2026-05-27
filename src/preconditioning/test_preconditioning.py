@@ -8,6 +8,7 @@ import numpy as np
 import scipy
 from scipy.sparse.linalg import aslinearoperator
 import ilupp
+import pyamg
 
 from ..dataset import DataSet
 from ..utils import save
@@ -17,13 +18,7 @@ from .assemble import assemble
 from ..discretise import _discretise_batch, _make_attributes
 from .linear_maps import Kronecker, Identity, Chain
 from ..training.models.ngo import NGO
-from .smoothers import (
-    DiffusionSmoother,
-    DownwindILU,
-    DownwindGS,
-    DownwindBlockGS,
-    HelmholtzSmoother,
-)
+from .smoothers import DiffusionSmoother, DownwindGS
 from .coarse_solvers import make_Q
 
 
@@ -71,6 +66,8 @@ def make_smoother(batch_d, A, nodes, ids, config):
         return ilupp.ILU0Preconditioner(A)
     elif M_kind == "ichol":
         return ilupp.IChol0Preconditioner(A)
+    elif M_kind == "amg":
+        return pyamg.ruge_stuben_solver(A).aspreconditioner()
     elif M_kind.startswith("G_diffusion"):
         # Smoother format: "G_diffusion_H_wmin_r"
         # For example: G_diffusion_0.05_2_1.5
@@ -81,19 +78,6 @@ def make_smoother(batch_d, A, nodes, ids, config):
         h = (nodes_x[1] - nodes_x[0]).item()
         theta = np.array(batch_d["theta"][0, ix][:, iy])
         return DiffusionSmoother(h, max(wmin, int(H / h)), theta, r)
-    elif M_kind == "downwindilu":
-        xs = np.array(nodes_x[ix])
-        ys = np.array(nodes_y[iy])
-        v_x = batch_d["v_x"][0, 0, 0].item()
-        v_y = batch_d["v_y"][0, 0, 0].item()
-        return DownwindILU(xs, ys, A, v_x, v_y)
-    elif M_kind.startswith("downwindbgs_"):
-        nr_blocks = int(M_kind.split("_")[1])
-        xs = np.array(nodes_x[ix])
-        ys = np.array(nodes_y[iy])
-        v_x = batch_d["v_x"][0, 0, 0].item()
-        v_y = batch_d["v_y"][0, 0, 0].item()
-        return DownwindBlockGS(xs, ys, A, v_x, v_y, nr_blocks)
     elif M_kind.startswith("G_helmholtz_"):
         parts = M_kind.split("_")[2:]
         H = float(parts[0])
@@ -101,7 +85,6 @@ def make_smoother(batch_d, A, nodes, ids, config):
         r = float(parts[2])
         h = (nodes_x[1] - nodes_x[0]).item()
         k = np.array(batch_d["theta"][0, ix][:, iy])
-        # return HelmholtzSmoother(h, max(wmin, int(H / h)), k, r)
         return DiffusionSmoother(h, max(wmin, int(H / h)), np.ones_like(k), r)
     elif M_kind == "gs4":
         xs = np.array(nodes_x[ix])
