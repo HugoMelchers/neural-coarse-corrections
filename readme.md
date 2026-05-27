@@ -107,7 +107,7 @@ Note that some of these scripts take a long time to run (especially the DeepONet
 
 - Comment out some of the entries in `ns_tols` to skip fine meshes
 - Remove some entries from the `models` list to skip e.g. the DeepONet
-- Replace the data set range, i.e. replace `advdiff:9000-10000` by `advdiff:9000-9100` to only run on 100 test problems instead of 1000
+- Replace the data set range, e.g. replace `advdiff:9000-10000` by `advdiff:9000-9100` to only run on 100 test problems instead of 1000
 
 # Creating the plots
 
