@@ -13,3 +13,21 @@ with open(__file__) as f:
 
 with open("output/projection/script.py", "w") as f:
     f.write(script)
+
+basis = TensorBasis(BSpline.uniform((0, 1), 3, 3))
+proj = ProjectOnBasis(basis)
+save(proj, "output/projection-6x6/model.pt")
+with open(__file__) as f:
+    script = f.read()
+
+with open("output/projection-6x6/script.py", "w") as f:
+    f.write(script)
+
+basis = TensorBasis(BSpline.uniform((0, 1), 21, 3))
+proj = ProjectOnBasis(basis)
+save(proj, "output/projection-24x24/model.pt")
+with open(__file__) as f:
+    script = f.read()
+
+with open("output/projection-24x24/script.py", "w") as f:
+    f.write(script)
