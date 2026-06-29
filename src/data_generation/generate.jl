@@ -87,6 +87,84 @@ function generate_diffusion_dataset_3()
     export_hdf5(settings, fields, "diffusion-dataset-3")
 end
 
+function generate_diffusion_dataset_3_finetheta()
+    settings = Dict(
+        "problem" => "diffusion",
+        "num" => 1000,
+        "seed" => 1234,
+        "check" => true,
+        "theta-segments" => 18,
+        "theta-degree" => 3,
+        "theta-min" => 0.2,
+        "theta-max" => 1.0,
+        "rhs-type" => "bspline-orthonormal",
+        "rhs-degree" => 3,
+        "rhs-segments" => 9,
+        "f-scale" => 1.0,
+        "g-scale" => 1.0,
+        "eta-scale" => 1.0,
+        "u-degree" => 3,
+        "u-segments" => 54,
+        "gamma" => 800.0,
+        "split" => false,
+    )
+    fields = sample_functions(settings, "Sampling")
+    solve(settings, fields)
+    export_hdf5(settings, fields, "diffusion-dataset-3-fine-theta")
+end
+
+function generate_diffusion_dataset_3_6x6()
+    settings = Dict(
+        "problem" => "diffusion",
+        "num" => 10000,
+        "seed" => 1234,
+        "check" => true,
+        "theta-segments" => 9,
+        "theta-degree" => 3,
+        "theta-min" => 0.2,
+        "theta-max" => 1.0,
+        "rhs-type" => "bspline-orthonormal",
+        "rhs-degree" => 3,
+        "rhs-segments" => 3,
+        "f-scale" => 1.0,
+        "g-scale" => 1.0,
+        "eta-scale" => 1.0,
+        "u-degree" => 3,
+        "u-segments" => 54,
+        "gamma" => 800.0,
+        "split" => false,
+    )
+    fields = sample_functions(settings, "Sampling")
+    solve(settings, fields)
+    export_hdf5(settings, fields, "diffusion-dataset-3-6x6")
+end
+
+function generate_diffusion_dataset_3_24x24()
+    settings = Dict(
+        "problem" => "diffusion",
+        "num" => 10000,
+        "seed" => 1234,
+        "check" => true,
+        "theta-segments" => 9,
+        "theta-degree" => 3,
+        "theta-min" => 0.2,
+        "theta-max" => 1.0,
+        "rhs-type" => "bspline-orthonormal",
+        "rhs-degree" => 3,
+        "rhs-segments" => 21,
+        "f-scale" => 1.0,
+        "g-scale" => 1.0,
+        "eta-scale" => 1.0,
+        "u-degree" => 3,
+        "u-segments" => 54,
+        "gamma" => 800.0,
+        "split" => false,
+    )
+    fields = sample_functions(settings, "Sampling")
+    solve(settings, fields)
+    export_hdf5(settings, fields, "diffusion-dataset-3-24x24")
+end
+
 function generate_advdiff_low_peclet()
     settings = Dict(
         "problem" => "advection-diffusion",
