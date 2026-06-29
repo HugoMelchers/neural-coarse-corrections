@@ -44,6 +44,9 @@ The dataset generation code has been written in Julia.
     - `generate_diffusion_dataset_1()`
     - `generate_diffusion_dataset_2()`
     - `generate_diffusion_dataset_3()`
+    - `generate_diffusion_dataset_3_finetheta()`
+    - `generate_diffusion_dataset_3_6x6()`
+    - `generate_diffusion_dataset_3_24x24()`
     - `generate_advdiff()`
     - `generate_advdiff_low_peclet()`
     - `generate_advdiff_high_peclet()`
@@ -94,6 +97,8 @@ The results are stored in the `output/` folder, which will look as follows if al
     - `ngo/`
     - `rino/`
     - `varmion/`
+
+Additionally, run `python -m scripts.training.make-projection` to create and save some `Projection` models that are used to store preconditioning results for exact two-level preconditioners.
 
 # Running the preconditioners
 
