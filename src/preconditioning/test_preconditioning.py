@@ -76,7 +76,8 @@ def make_smoother(batch_d, A, nodes, ids, config):
         wmin = int(parts[1])
         r = float(parts[2])
         h = (nodes_x[1] - nodes_x[0]).item()
-        theta = np.array(batch_d["theta"][0, ix][:, iy])
+        pow = config.get("powtheta", 1)
+        theta = np.array(batch_d["theta"][0, ix][:, iy] ** pow)
         return DiffusionSmoother(h, max(wmin, int(H / h)), theta, r)
     elif M_kind.startswith("G_helmholtz_"):
         parts = M_kind.split("_")[2:]
@@ -189,7 +190,7 @@ def test_preconditioning(config, desc=None, save_results=True, print_summary=Tru
 
         # Assemble linear system
         t0 = timer()
-        A, b, quad, (ix, iy) = assemble(batch, nx, ny)
+        A, b, quad, (ix, iy) = assemble(batch, nx, ny, config)
         t_assemble = timer() - t0
         if random_rhs:
             b = np.random.randn(b.size)

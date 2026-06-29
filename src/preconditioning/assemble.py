@@ -138,9 +138,9 @@ class StencilOperator(LinearOperator):
         return A.tocsr()
 
 
-def assemble(batch, nx, ny):
+def assemble(batch, nx, ny, config={}):
     if batch["problem"] == "diffusion":
-        return assemble_diffusion(batch, nx, ny)
+        return assemble_diffusion(batch, nx, ny, config)
     elif batch["problem"] == "advection-diffusion":
         return assemble_advection_diffusion(batch, nx, ny)
     elif batch["problem"] == "helmholtz":
@@ -149,9 +149,9 @@ def assemble(batch, nx, ny):
         raise ValueError(f"assemble(): got unsupported problem type \"{batch['problem']}\"")
 
 
-def assemble_diffusion(batch, nx, ny):
+def assemble_diffusion(batch, nx, ny, config):
     """
-        assemble_diffusion(batch, nx, ny)
+        assemble_diffusion(batch, nx, ny, config)
 
     Create a finite volume discretisation of the diffusion problem given by the first problem in
     the batch. Note that the batch should contain functions, not samples. The discretisation will
@@ -178,6 +178,10 @@ def assemble_diffusion(batch, nx, ny):
     eta_top = np.array(batch["top:eta"][0](nodes_x))
     g_left = np.array(batch["left:g"][0](nodes_y))
     g_right = np.array(batch["right:g"][0](nodes_y))
+
+    # If "powtheta" is set, replace theta by theta ^ k
+    if (pow := config.get("powtheta")) is not None:
+        theta = theta**pow
 
     eta = np.stack((eta_bottom, eta_top), axis=-1)
     g = np.stack((g_left, g_right), axis=0)

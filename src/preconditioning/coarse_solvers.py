@@ -54,8 +54,9 @@ def make_Q_projection(model, A, batch, quad, ids, config):
         E = (E + E.T) / 2
 
     def remove_dofs(arr):
+        m = len(model.basis.f_x)
         if noleftright or nobottomtop:
-            to_remove = np.full((12, 12), False)
+            to_remove = np.full((m, m), False)
             if noleftright:
                 to_remove[0, :] = True
                 to_remove[-1, :] = True
@@ -166,6 +167,43 @@ class ContinuousModelWrapper(LinearOperator):
         batch_d["problem"] = prob
         batch_d.update(attributes)
 
+        # If enabled, "rotate" the PDEs by 90 degrees (actually transpose) so that the Dirichlet
+        # boundaries are bottom and top, and the Neumann boundaries are left and right. If we apply the
+        # original (un-rotated) NGO to this problem, we end up with a preconditioner based on the wrong
+        # boundary conditions, so we can test how well that still works.
+        #
+        # To do this, we
+        #   (1) Rotate the diffusivity field we pass to the NGO
+        #   (2) Rotate the right-hand-side vector in application of the preconditioner
+        #   (3) Rotate the resulting vector back
+        swapxy = config.get("swapxy", False)
+        if swapxy:
+            batch_d["theta"] = batch_d["theta"].mT
+            batch_d["nodes_x"], batch_d["nodes_y"] = batch_d["nodes_y"], batch_d["nodes_x"]
+            batch_d["weights_x"], batch_d["weights_y"] = batch_d["weights_y"], batch_d["weights_x"]
+            # Also swap the Dirichlet and Neumann boundary data, since those can have different size
+            tmp = batch_d["dirichlet:g"]
+            batch_d["dirichlet:g"] = batch_d["neumann:eta"].mT
+            batch_d["neumann:eta"] = tmp.mT
+            batch_d["f"] = batch_d["f"].mT
+
+        if (pow := config.get("powtheta_ngo")) is not None:
+            batch_d["theta"] = batch_d["theta"] ** pow
+        elif (pow := config.get("powtheta")) is not None:
+            # Don't take powers of theta as input to the NGO, but *do* rescale so that our
+            # preconditioner isn't too large.
+            #
+            # (theta is always smaller than one so taking powers decreases theta, so our
+            # preconditioner should scale accordingly)
+            th_avg = torch.einsum(
+                "x,Bxy,y->B", batch_d["weights_x"], batch_d["theta"], batch_d["weights_y"]
+            )
+            th_avg_pow = torch.einsum(
+                "x,Bxy,y->B", batch_d["weights_x"], batch_d["theta"] ** pow, batch_d["weights_y"]
+            )
+            # Scale so that we have the right average
+            batch_d["theta"] = batch_d["theta"] * th_avg_pow / th_avg
+
         # If pe_max is set, approximate the Péclet number of this problem, and increase the
         # diffusion if the Péclet number exceeds the given maximum. (advection-diffusion only).
         pe_max = config.get("pe_max", None)
@@ -189,10 +227,17 @@ class ContinuousModelWrapper(LinearOperator):
         self.shape = (N, N)
         self.noleftright = config.get("noleftright", False)
         self.nobottomtop = config.get("nobottomtop", False)
+        self.swapxy = swapxy
 
     def _matvec(self, x):
         f = np.reshape(x, (self.nx, self.ny))
         ix, iy = self.ids
+
+        # Swap input axes if necessary
+        if self.swapxy:
+            ix, iy = iy, ix
+            f = f.T
+
         # The following line is very ugly, but has to be written in that specific way. What I *want*
         # to write is
         #
@@ -227,6 +272,9 @@ class ContinuousModelWrapper(LinearOperator):
             coeffs[:, -1] = 0
 
         values = einsum("ix,ij,jy->xy", basis_x[:, ix], coeffs, basis_y[:, iy])
+        if self.swapxy:
+            values = values.T
+
         # Give output
         return np.array(values.flatten())
 
@@ -295,8 +343,9 @@ def make_Q_ngo(model, A, batch, quad, ids, config):
     P = R.T
 
     def remove_dofs(arr):
+        m = len(model.basis.f_x)
         if noleftright or nobottomtop:
-            to_remove = np.full((12, 12), False)
+            to_remove = np.full((m, m), False)
             if noleftright:
                 to_remove[0, :] = True
                 to_remove[-1, :] = True
