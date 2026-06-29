@@ -18,7 +18,7 @@ ngo = "output/helmholtz/ngo/model.pt"
 
 data = DataSet.load("helmholtz:0-1")
 for k in [5, 20]:
-    path = f"spectra-helmholtz-k{k}"
+    path = f"spectra-helmholtz-n{n}-k{k}"
     data.data["theta"].weights.fill_(k)
     batch = data.get_batch(slice(0, 1), "cpu")
     # 3. Assemble
@@ -100,12 +100,16 @@ for k in [5, 20]:
     ]
 
     try:
-        evses = torch.load("scripts/plotting/cache/" + path + ".pt", weights_only=False)
+        (evses, comms, nus) = torch.load(
+            "scripts/plotting/cache/" + path + ".pt", weights_only=False
+        )
     except:
         evses = []
+        comms = []
+        nus = []
         for config in configs:
             config["model"] = torch.load(config["model_path"], weights_only=False)
-            A, b, quad, (ix, iy) = assemble(batch, n + 1, n)
+            A, b, quad, (ix, iy) = assemble(batch, n + 1, n, config)
             system = make_preconditioned_system(
                 A, b, deepcopy(batch), config["model"], config, quad, (ix, iy)
             )
@@ -124,9 +128,18 @@ for k in [5, 20]:
                 b[i] = 0.0
 
             evs = np.linalg.eigvals(AM_dense)
+            # Commutator error
+            AAT = AM_dense @ AM_dense.T
+            ATA = AM_dense.T @ AM_dense
+            comm = np.linalg.norm(AAT - ATA) / np.linalg.norm(AAT)
+            # Henrici departure from normality ν
+            nu = np.sqrt(np.linalg.norm(AM_dense) ** 2 - np.sum(np.abs(evs) ** 2))
             evses.append(evs)
+            comms.append(comm)
+            print(f"nu = {nu}, commutator error = {comm}")
+            nus.append(nu)
 
-        torch.save(evses, "scripts/plotting/cache/" + path + ".pt")
+        torch.save((evses, comms, nus), "scripts/plotting/cache/" + path + ".pt")
 
     # Make plot with a subfigure for each spectrum
     fig, axs = plt.subplots(nrows=2, ncols=3)
@@ -144,12 +157,12 @@ for k in [5, 20]:
     axs[1, 1].scatter(evses[4].real, evses[4].imag, 1.0, color="C2", alpha=alpha)
     axs[0, 2].scatter(evses[5].real, evses[5].imag, 1.0, color="C3", alpha=alpha)
     axs[1, 2].scatter(evses[6].real, evses[6].imag, 1.0, color="C4", alpha=alpha)
-    axs[0, 0].set_title("Smoother only")
-    axs[1, 0].set_title("Exact")
-    axs[0, 1].set_title("DeepONet")
-    axs[1, 1].set_title("RINO")
-    axs[0, 2].set_title("VarMiON")
-    axs[1, 2].set_title("NGO")
+    axs[0, 0].set_title(rf"Smoother only (${comms[1]:.3f}$)")
+    axs[1, 0].set_title(rf"Exact (${comms[2]:.3f}$)")
+    axs[0, 1].set_title(rf"DeepONet (${comms[3]:.3f}$)")
+    axs[1, 1].set_title(rf"RINO (${comms[4]:.3f}$)")
+    axs[0, 2].set_title(rf"VarMiON (${comms[5]:.3f}$)")
+    axs[1, 2].set_title(rf"NGO (${comms[6]:.3f}$)")
     # plt.suptitle(f"Preconditioned spectra ($k = {k}$)")
     plt.tight_layout()
     plt.savefig(f"plots/helmholtz/spectra-k{k}.pdf", transparent=True)

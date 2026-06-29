@@ -17,15 +17,31 @@ from timeit import default_timer as timer
 from src import DataSet, TensorGrid, NGO
 from src.preconditioning.test_preconditioning import make_smoother, Chain, assemble, Kronecker
 from src.discretise import _discretise_batch, _make_attributes
-from logging_linop import Timed
+from .logging_linop import Timed
 
-dataset_name = "diffusion-dataset-3:9000-10000"
-n = 80
+import sys
+
+args = sys.argv[1:]
+
+
+m = int(args[0])  # Choices: 6, 12, 24
+assert m in [6, 24]
+H = {6: "0.1", 12: "0.05", 24: "0.025"}[m]
+
+n = int(args[1])
+assert n in [20, 40, 80, 160, 320]
+
+dataset_name = "diffusion:9000-10000"
 tol = 4e-6
-outfile = f"scripts/plotting/cache/timings-n{n}-desktop-1t"
-projection_path = "projection"
-ngo_path = "diffusion/ngo"
-smoother = "G_diffusion_0.05_1_1.5"
+outfile = f"scripts/plotting/cache/timings-n{n}-desktop-1t-{m}x{m}"
+projection_path = "diffusion/projection" if m == 12 else f"diffusion/projection-{m}x{m}"
+if m == 6:
+    ngo_path = "diffusion/ngo-6x6"
+elif m == 12:
+    ngo_path = "diffusion/ngo2"
+else:
+    ngo_path = "diffusion/ngo-24x24/epoch-2283"
+smoother = f"G_diffusion_{H}_1_1.5"
 
 nx, ny = (n + 1, n)
 
@@ -58,7 +74,7 @@ def make_Q_projection(model, A, nodes, ids, config, cache):
 
     def remove_dofs(arr):
         if noleftright or nobottomtop:
-            to_remove = np.full((12, 12), False)
+            to_remove = np.full((m, m), False)
             if noleftright:
                 to_remove[0, :] = True
                 to_remove[-1, :] = True
@@ -118,7 +134,7 @@ def make_Q_ngo(model, A, batch_d, quad, ids, config, cache):
 
     def remove_dofs(arr):
         if noleftright or nobottomtop:
-            to_remove = np.full((12, 12), False)
+            to_remove = np.full((m, m), False)
             if noleftright:
                 to_remove[0, :] = True
                 to_remove[-1, :] = True
@@ -163,7 +179,7 @@ for i in iter:
 
     # Assemble linear system
     t0 = timer()
-    A, b, quad, ids = assemble(batch, nx, ny)
+    A, b, quad, ids = assemble({}, batch, nx, ny)
     ts_assemble[i] = timer() - t0
     (nodes_x, weights_x, nodes_y, weights_y) = quad
     ix, iy = ids
@@ -244,17 +260,17 @@ for i in iter:
     A_timed.ts = []
     ts_eval_P_AMG[i] = sum(P_AMG.ts)
 
-    alldata = {
-        "ts_assemble": ts_assemble,
-        "ts_construct_M": ts_construct_M,
-        "ts_construct_Q_exact": ts_construct_Q_exact,
-        "ts_construct_Q_ngo": ts_construct_Q_ngo,
-        "ts_construct_P_AMG": ts_construct_P_AMG,
-        "its": its,
-        "ts_solve": ts_solve,
-        "ts_eval_M": ts_eval_M,
-        "ts_eval_Q_exact": ts_eval_Q_exact,
-        "ts_eval_Q_ngo": ts_eval_Q_ngo,
-        "ts_eval_P_AMG": ts_eval_P_AMG,
-    }
-    torch.save(alldata, outfile + ".pt")
+alldata = {
+    "ts_assemble": ts_assemble,
+    "ts_construct_M": ts_construct_M,
+    "ts_construct_Q_exact": ts_construct_Q_exact,
+    "ts_construct_Q_ngo": ts_construct_Q_ngo,
+    "ts_construct_P_AMG": ts_construct_P_AMG,
+    "its": its,
+    "ts_solve": ts_solve,
+    "ts_eval_M": ts_eval_M,
+    "ts_eval_Q_exact": ts_eval_Q_exact,
+    "ts_eval_Q_ngo": ts_eval_Q_ngo,
+    "ts_eval_P_AMG": ts_eval_P_AMG,
+}
+torch.save(alldata, outfile + ".pt")

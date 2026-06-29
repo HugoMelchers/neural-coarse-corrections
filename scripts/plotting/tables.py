@@ -15,7 +15,18 @@ def fmt_table(table):
 
 
 def makeplot(
-    ns, *, solver, fileses, colours, alphas, seps, outfile, title=None, loc=None, outer=False
+    ns,
+    *,
+    solver,
+    fileses,
+    colours,
+    alphas,
+    seps,
+    outfile,
+    title=None,
+    loc=None,
+    outer=False,
+    **kwargs,
 ):
     means1 = np.full((len(fileses), len(ns)), np.nan)
     means2 = np.full((len(fileses), len(ns)), np.nan)
@@ -37,6 +48,8 @@ def makeplot(
                 if n_fails > 500:
                     continue
                 means1[i, j] = iters.mean()
+            else:
+                print(f"{path} doesn't exist")
 
     for i, (_, files) in enumerate(fileses):
         for j, file in enumerate(files):
@@ -88,7 +101,7 @@ def makeplot(
             ax.set_position([box.x0, box.y0, box.width * 0.7, box.height])
             plt.legend(loc=loc, bbox_to_anchor=(1.0, 0.5))
         else:
-            plt.legend(loc=loc, ncols=2)
+            plt.legend(loc=loc, **kwargs.get("lgnd", {"ncols": 2}))
 
     if title is None:
         title = f"{solver} preconditioner effectiveness"
