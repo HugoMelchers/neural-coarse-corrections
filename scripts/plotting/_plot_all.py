@@ -11,7 +11,6 @@ from . import diffusion_rhss
 from . import diffusion_small_large
 from . import diffusion_smoother
 from . import diffusion_spectra
-from . import diffusion_swapxy
 
 
 from . import advdiff_conv
