@@ -13,6 +13,9 @@ This project contains the code associated with the paper on neural operators as 
 - `datasets/`: stores generated datasets for training and testing networks
 - `output/`: stores trained models as well as their errors etc.
 
+> [!note]
+> The code currently reproduces the results up to the revision from July (arXiv v3). Adding code for the newer results is a work in progress.
+
 # Installation
 
 1. Download the source code: `git clone git@github.com:HugoMelchers/neural-coarse-corrections.git`. This library is known to work with Python 3.12. I recommend [PyEnv](https://github.com/pyenv/pyenv) to manage installed versions of Python.
