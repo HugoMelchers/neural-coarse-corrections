@@ -142,6 +142,12 @@ def _get_basis(group):
     elif basis_type == b"tensor" or basis_type == "tensor":
         basis_x = _get_basis(group["x"])
         basis_y = _get_basis(group["y"])
+        if "z" in group:
+            # Imported here to avoid a circular import
+            from src.diffusion3d.basis import TensorBasis3D
+
+            basis_z = _get_basis(group["z"])
+            return TensorBasis3D(basis_x, basis_y, basis_z)
         return TensorBasis(basis_x, basis_y)
     else:
         raise ValueError(f"unexpected basis type {basis_type}")
@@ -159,5 +165,12 @@ def _get_field(group):
         # the Julia ordering is (x, number) which is then correctly loaded as (number, x), so
         # nothing needs to be done in that case.
         weights = weights.permute(0, 2, 1)
+    elif weights.ndim == 4:
+        # Same as above for 3D functions: the Julia ordering (x, y, z, number) is loaded as
+        # (number, z, y, x), so we reverse the last three axes
+        from src.diffusion3d.basis import Functions3D
+
+        weights = weights.permute(0, 3, 2, 1)
+        return Functions3D(basis, weights.flatten(1))
 
     return Functions(basis, weights)

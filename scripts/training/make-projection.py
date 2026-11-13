@@ -31,3 +31,12 @@ with open(__file__) as f:
 
 with open("output/projection-24x24/script.py", "w") as f:
     f.write(script)
+
+basis = TensorBasis3D(BSpline.uniform((0, 1), 5, 3))
+proj = ProjectOnBasis(basis)
+save(proj, "output/diffusion3d/projection/model.pt")
+with open(__file__) as f:
+    script = f.read()
+
+with open("output/diffusion3d/projection/script.py", "w") as f:
+    f.write(script)

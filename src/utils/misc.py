@@ -269,25 +269,32 @@ def print_param_count_tree(model):
     _show_param_count_tree(tree)
 
 
-def norm_sq(x, weights_x, weights_y):
+def norm_sq(x, weights_x, weights_y, weights_z=None):
     """
     Returns the squared norm of the matrix `x`, assumed to be B×X×Y, weighted by the quadrature
-    weights weights_x and weights_y.
+    weights weights_x and weights_y. If `weights_z` is given, `x` is instead assumed to be B×X×Y×Z.
     """
     # Assume tensorised
-    return torch.einsum("Bxy,x,y->B", x.abs().square(), weights_x, weights_y)
+    if weights_z is None:
+        return torch.einsum("Bxy,x,y->B", x.abs().square(), weights_x, weights_y)
+    else:
+        return torch.einsum("Bxyz,x,y,z->B", x.abs().square(), weights_x, weights_y, weights_z)
 
 
 def relative_errors(
-    predicted: torch.Tensor, actual: torch.Tensor, weights_x: torch.Tensor, weights_y: torch.Tensor
+    predicted: torch.Tensor,
+    actual: torch.Tensor,
+    weights_x: torch.Tensor,
+    weights_y: torch.Tensor,
+    weights_z: Union[torch.Tensor, None] = None,
 ) -> torch.Tensor:
     if predicted.shape != actual.shape:
         raise RuntimeError(
             f"relative_error: got differing shapes {predicted.shape=}, {actual.shape=}"
         )
 
-    errs = norm_sq(predicted - actual, weights_x, weights_y)
-    norms = norm_sq(actual, weights_x, weights_y)
+    errs = norm_sq(predicted - actual, weights_x, weights_y, weights_z)
+    norms = norm_sq(actual, weights_x, weights_y, weights_z)
     return errs / norms
 
 

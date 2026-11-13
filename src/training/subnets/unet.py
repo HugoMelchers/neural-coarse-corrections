@@ -72,11 +72,9 @@ class UNet(nn.Module):
         fix_adjoint = self.config.get("fix-adjoint", False)
         # If an input size is given, check that this input has the right size
         if (input_size := self.config.get("input-size")) is not None:
-            c0, nx0, ny0 = input_size
-            err = f"UNet: expected shape (B, {c0}, {nx0}, {ny0}), got {img.shape}"
-            assert img.ndim == 4, err
-            B, c, nx, ny = img.shape
-            assert (c, nx, ny) == (c0, nx0, ny0), err
+            err = f"UNet: expected shape (B, {', '.join(map(str, input_size))}), got {img.shape}"
+            assert img.ndim == 1 + len(input_size), err
+            assert tuple(img.shape[1:]) == tuple(input_size), err
 
         # Step 1: lifting
         if self.lifting is not None:
@@ -119,10 +117,11 @@ class UNet(nn.Module):
         widths: List[int],
         strides: List[int],
         pointwise_dim: int,
-        input_size: Union[int, Tuple[int, int]],
+        input_size: Union[int, Tuple[int, ...]],
         skip_type: str,
         bias: bool = True,
         complex: bool = False,
+        dim: int = 2,
     ):
         """
         Construct a UNet. Parameters:
@@ -142,10 +141,13 @@ class UNet(nn.Module):
           when `skip_type = "add"`. Can also be set to None, to use only a single linear layer (from
           2C to C channels) in the pointwise mapping, instead of 2 (from 2C to `pointwise_dim` and
           then to C channels)
-        - `input_size: Union[int, Tuple[int, int]]`: the dimensions of the input array
+        - `input_size: Union[int, Tuple[int, ...]]`: the dimensions of the input array
         - `skip_type: str`
         - `bias: bool = True`
         - `complex: bool = False`
+        - `dim: int = 2`: the number of spatial dimensions of the input, i.e. 2 for images of shape
+          B × C × nx × ny (using 2D convolutions) or 3 for volumes of shape B × C × nx × ny × nz
+          (using 3D convolutions)
         """
         if isinstance(activation, str):
             activation = get_activation(activation)
@@ -153,6 +155,9 @@ class UNet(nn.Module):
             assert isinstance(activation, nn.Module)
 
         dtype = torch.complex64 if complex else torch.float32
+        assert dim in (2, 3), f"UNet: dim must be 2 or 3, got {dim}"
+        Conv = nn.Conv2d if dim == 2 else nn.Conv3d
+        ConvTranspose = nn.ConvTranspose2d if dim == 2 else nn.ConvTranspose3d
 
         # If our UNet is affine or linear, we can remove some layers since the concatenation of
         # affine layers is again affine, and the concatenation of linear layers is again linear
@@ -160,7 +165,8 @@ class UNet(nn.Module):
         is_linear = is_affine and (not bias)
 
         if isinstance(input_size, int):
-            input_size = (input_size, input_size)
+            input_size = (input_size,) * dim
+        assert len(input_size) == dim, f"UNet: expected {dim}-dimensional input_size"
 
         n_convs = len(widths)
         assert len(strides) == n_convs
@@ -174,47 +180,41 @@ class UNet(nn.Module):
             lifting = None
         elif is_affine:
             lifting = nn.Sequential(
-                nn.Conv2d(
-                    in_channels, channels[0], kernel_size=1, stride=1, bias=bias, dtype=dtype
-                ),
+                Conv(in_channels, channels[0], kernel_size=1, stride=1, bias=bias, dtype=dtype),
             )
         else:
             lifting = nn.Sequential(
-                nn.Conv2d(
-                    in_channels, lifting_dim, kernel_size=1, stride=1, bias=bias, dtype=dtype
-                ),
+                Conv(in_channels, lifting_dim, kernel_size=1, stride=1, bias=bias, dtype=dtype),
                 activation,
-                nn.Conv2d(
-                    lifting_dim, channels[0], kernel_size=1, stride=1, bias=bias, dtype=dtype
-                ),
+                Conv(lifting_dim, channels[0], kernel_size=1, stride=1, bias=bias, dtype=dtype),
             )
 
-        n_x, n_y = input_size
+        # Size of the array after all the strided convolutions
+        sizes = list(input_size)
         for stride in strides:
-            n_x //= stride
-            n_y //= stride
+            sizes = [n // stride for n in sizes]
 
         convs = [
             nn.Sequential(
-                nn.Conv2d(
-                    channels[i], channels[i + 1], widths[i], strides[i], bias=bias, dtype=dtype
-                ),
+                Conv(channels[i], channels[i + 1], widths[i], strides[i], bias=bias, dtype=dtype),
                 activation,
             )
             for i in range(n_convs)
         ]
 
-        dense_size = n_x * n_y * channels[-1]
+        dense_size = channels[-1]
+        for n in sizes:
+            dense_size *= n
         dense = nn.Sequential(
-            StrictReshapeLayer((channels[-1], n_x, n_y), (dense_size,)),
+            StrictReshapeLayer((channels[-1], *sizes), (dense_size,)),
             nn.Linear(dense_size, dense_size, bias=bias, dtype=dtype),
             activation,
-            StrictReshapeLayer((dense_size,), (channels[-1], n_x, n_y)),
+            StrictReshapeLayer((dense_size,), (channels[-1], *sizes)),
         )
 
         tr_convs = [
             nn.Sequential(
-                nn.ConvTranspose2d(
+                ConvTranspose(
                     channels[i + 1], channels[i], widths[i], strides[i], bias=bias, dtype=dtype
                 ),
                 activation,
@@ -227,47 +227,42 @@ class UNet(nn.Module):
             if pointwise_dim is None:
                 skips = [
                     nn.Sequential(
-                        nn.Conv2d(2 * channels[i], channels[i], 1, 1, bias=bias, dtype=dtype),
+                        Conv(2 * channels[i], channels[i], 1, 1, bias=bias, dtype=dtype),
                         activation,
                     )
                     for i in range(n_convs)
                 ]
             elif is_affine:
                 skips = [
-                    nn.Conv2d(2 * channels[i], channels[i], 1, 1, bias=bias, dtype=dtype)
+                    Conv(2 * channels[i], channels[i], 1, 1, bias=bias, dtype=dtype)
                     for i in range(n_convs)
                 ]
             else:
                 skips = [
                     nn.Sequential(
-                        nn.Conv2d(2 * channels[i], pointwise_dim, 1, 1, bias=bias, dtype=dtype),
+                        Conv(2 * channels[i], pointwise_dim, 1, 1, bias=bias, dtype=dtype),
                         activation,
-                        nn.Conv2d(pointwise_dim, channels[i], 1, 1, bias=bias, dtype=dtype),
+                        Conv(pointwise_dim, channels[i], 1, 1, bias=bias, dtype=dtype),
                         activation,
                     )
                     for i in range(n_convs)
                 ]
         elif skip_type == "add":
             skips = [
-                nn.Conv2d(channels[i], channels[i], 1, 1, bias=bias, dtype=dtype)
-                for i in range(n_convs)
+                Conv(channels[i], channels[i], 1, 1, bias=bias, dtype=dtype) for i in range(n_convs)
             ]
 
         if projection_dim is None:
             projection = None
         elif is_affine:
-            projection = nn.Conv2d(
+            projection = Conv(
                 channels[0], out_channels, kernel_size=1, stride=1, bias=bias, dtype=dtype
             )
         else:
             projection = nn.Sequential(
-                nn.Conv2d(
-                    channels[0], projection_dim, kernel_size=1, stride=1, bias=bias, dtype=dtype
-                ),
+                Conv(channels[0], projection_dim, kernel_size=1, stride=1, bias=bias, dtype=dtype),
                 activation,
-                nn.Conv2d(
-                    projection_dim, out_channels, kernel_size=1, stride=1, bias=bias, dtype=dtype
-                ),
+                Conv(projection_dim, out_channels, kernel_size=1, stride=1, bias=bias, dtype=dtype),
             )
 
         unet = UNet(

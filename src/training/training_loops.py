@@ -14,6 +14,8 @@ def _get_batch_errors(model, kind, batch):
     actual = batch["u"]
     weights_x = batch["u/weights_x"]
     weights_y = batch["u/weights_y"]
+    # Only present for 3D problems
+    weights_z = batch.get("u/weights_z")
     if kind == "model":
         predicted = model(batch)
     elif kind == "branch":
@@ -21,7 +23,7 @@ def _get_batch_errors(model, kind, batch):
     else:
         raise ValueError(f'"kind" must be one of "model", "branch" (got "{kind}")')
 
-    return relative_errors(predicted, actual, weights_x, weights_y)
+    return relative_errors(predicted, actual, weights_x, weights_y, weights_z)
 
 
 def _get_overall_error(model, kind, dataset, *, device="cuda", batch_size=20):
