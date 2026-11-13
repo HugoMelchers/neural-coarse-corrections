@@ -18,7 +18,7 @@ from .assemble import assemble
 from ..discretise import _discretise_batch, _make_attributes
 from .linear_maps import Kronecker, Identity, Chain
 from ..training.models.ngo import NGO
-from .smoothers import DiffusionSmoother, DownwindGS
+from .smoothers import BlockJacobiSmoother, DiffusionSmoother, DownwindGS, JacobiSmoother
 from .coarse_solvers import make_Q
 
 
@@ -62,6 +62,14 @@ def make_smoother(batch_d, A, nodes, ids, config):
     M_kind = config.get("M", None)
     if M_kind is None:
         return Identity(A.shape[0], np.float64)
+    elif M_kind == "jacobi":
+        return (4 / 5) * JacobiSmoother(A)
+    elif M_kind.startswith("blockjacobi_"):
+        # Format: blockjacobi_Bx_By, where Bx and By are the numbers of blocks in the x- and y-directions
+        params = M_kind.split("_")[1:]
+        Bx = int(params[0])
+        By = int(params[1])
+        return (4 / 5) * BlockJacobiSmoother(A, len(ix), len(iy), Bx, By)
     elif M_kind == "ilu":
         return ilupp.ILU0Preconditioner(A)
     elif M_kind == "ichol":

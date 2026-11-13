@@ -1,5 +1,5 @@
 import scipy
-from scipy.sparse.linalg import LinearOperator
+from scipy.sparse.linalg import LinearOperator, splu
 from scipy.special import kn as besselk, y0, y0_zeros
 import numpy as np
 import torch
@@ -47,6 +47,45 @@ def _filter_fft(nx, ny, filter, x, filter_fft=None):
         return y_padded[w:-w, w:-w].ravel()
     else:
         return y_padded.real[w:-w, w:-w].ravel()
+
+
+class JacobiSmoother(LinearOperator):
+    def __init__(self, A):
+        self.dtype = A.dtype
+        self.shape = A.shape
+        self.invD = 1 / A.diagonal()
+
+    def _matvec(self, x):
+        return x * self.invD
+
+
+class BlockJacobiSmoother(LinearOperator):
+    def __init__(self, A, nx, ny, Bx, By):
+        self.dtype = A.dtype
+        self.shape = A.shape
+        # First, extract the diagonal blocks whose inverse we use.
+        # The blocks are based on rectangular (approximately square) subdomains of the (0, 1)²
+        # domain.
+        # Boundaries of blocks in the x- and y-directions
+        bxs = np.round(np.linspace(0, nx, Bx + 1)).astype(np.int32)
+        bys = np.round(np.linspace(0, ny, By + 1)).astype(np.int32)
+        bxs = [np.arange(bxs[i - 1], bxs[i]) for i in range(1, len(bxs))]
+        bys = [np.arange(bys[i - 1], bys[i]) for i in range(1, len(bys))]
+        # Now compute the indices into A per block. A is ordered y-varies-first, so the point (i, j)
+        # becomes the index ny * i + j.
+        block_ids = [(ny * bx[:, None] + by[None, :]).ravel() for by in bys for bx in bxs]
+        blocks = [A[i][:, i].tocsc() for i in block_ids]
+        self.inv_blocks = [splu(block) for block in blocks]
+        self.block_ids = block_ids
+
+    def _matvec(self, x):
+        x_blocks = [x[ids] for ids in self.block_ids]
+        y_blocks = [block.solve(x_block) for (block, x_block) in zip(self.inv_blocks, x_blocks)]
+        y = np.zeros(x.shape, dtype=x.dtype)
+        for ids, block in zip(self.block_ids, y_blocks):
+            y[ids] = block
+
+        return y
 
 
 class DiffusionSmoother(LinearOperator):
