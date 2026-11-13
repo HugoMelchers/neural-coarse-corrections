@@ -179,7 +179,17 @@ def test_preconditioning(config, desc=None, save_results=True, print_summary=Tru
         model = None
 
     N = len(dataset)
-    nx, ny = config["grid_size"]
+    grid_size = config["grid_size"]
+    assemble_fn, make_system_fn = assemble, make_preconditioned_system
+    if dataset.config["problem"] == "diffusion3d":
+        # Imported here to avoid a circular import
+        from ..diffusion3d.preconditioning import (
+            assemble_diffusion_3d,
+            make_preconditioned_system_3d,
+        )
+
+        assemble_fn, make_system_fn = assemble_diffusion_3d, make_preconditioned_system_3d
+
     iter = range(N) if desc is None else trange(N, desc=desc, ascii=True, dynamic_ncols=True)
     kwargs = {}
     ts_assemble = np.zeros(N)
@@ -198,13 +208,13 @@ def test_preconditioning(config, desc=None, save_results=True, print_summary=Tru
 
         # Assemble linear system
         t0 = timer()
-        A, b, quad, (ix, iy) = assemble(batch, nx, ny, config)
+        A, b, quad, ids = assemble_fn(batch, *grid_size, config)
         t_assemble = timer() - t0
         if random_rhs:
             b = np.random.randn(b.size)
 
         normb = np.linalg.norm(b)
-        system = make_preconditioned_system(A, b, batch, model, config, quad, (ix, iy))
+        system = make_system_fn(A, b, batch, model, config, quad, ids)
         system.kwargs["rtol"] = 0.0
         system.kwargs["atol"] = config["tol"] * normb
         system.solve()

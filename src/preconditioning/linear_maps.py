@@ -22,20 +22,29 @@ class Identity(LinearOperator):
 
 
 class Kronecker(LinearOperator):
-    def __init__(self, A, B):
-        self.A = A
-        self.B = B
-        m1, n1 = A.shape
-        m2, n2 = B.shape
-        self.shape = (m1 * m2, n1 * n2)
-        self.dtype = A.dtype
+    def __init__(self, *factors):
+        """
+        Construct the Kronecker product A₁ ⊗ A₂ ⊗ ... of two or more matrices. Vectors are
+        interpreted as row-major arrays of shape (n₁, n₂, ...), i.e. the index of the last factor
+        varies fastest.
+        """
+        assert len(factors) >= 2, "Kronecker: expected at least two factors"
+        self.factors = factors
+        self.shape = (
+            int(np.prod([F.shape[0] for F in factors])),
+            int(np.prod([F.shape[1] for F in factors])),
+        )
+        self.dtype = factors[0].dtype
 
     def _matvec(self, x):
-        x = np.reshape(x, (self.A.shape[1], self.B.shape[1]))
-        return (self.A @ x @ self.B.T).ravel()
+        x = np.reshape(x, [F.shape[1] for F in self.factors])
+        # Apply each factor along its own axis
+        for axis, F in enumerate(self.factors):
+            x = np.moveaxis(np.tensordot(F, x, axes=(1, axis)), 0, axis)
+        return x.ravel()
 
     def _adjoint(self):
-        return Kronecker(self.A.T, self.B.T)
+        return Kronecker(*(F.T for F in self.factors))
 
 
 class Chain(LinearOperator):
