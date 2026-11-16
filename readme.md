@@ -4,6 +4,8 @@ This project contains the code associated with the paper on neural operators as 
 
 - `src/` the folder containing the source code
   - `data_generation/`: code associated with generating training data
+    - `diffusion3d/`: code for the 3D diffusion data generation
+  - `diffusion3d/`: code for the training and preconditioning for 3D diffusion
   - `training/`: code associated with neural operator architectures and training loops
     - `subnets/`: implementations of subnetworks (U-Nets etc.)
     - `models/`: implementations of neural operators
@@ -13,9 +15,6 @@ This project contains the code associated with the paper on neural operators as 
 - `datasets/`: stores generated datasets for training and testing networks
 - `output/`: stores trained models as well as their errors etc.
 
-> [!note]
-> The code currently reproduces the results up to the revision from July (arXiv v3). Adding code for the newer results is a work in progress.
-
 # Installation
 
 1. Download the source code: `git clone git@github.com:HugoMelchers/neural-coarse-corrections.git`. This library is known to work with Python 3.12. I recommend [PyEnv](https://github.com/pyenv/pyenv) to manage installed versions of Python.
@@ -23,7 +22,7 @@ This project contains the code associated with the paper on neural operators as 
     ```bash
     cd neural-coarse-corrections
     # Create virtual environment
-    python -m venv venv
+    python -m venv --prompt neural-prec venv
     # Enter the environment
     source ./venv/bin/activate
     # Make sure pip is installed and install requirements
@@ -33,16 +32,17 @@ This project contains the code associated with the paper on neural operators as 
 
 # Generating the training data
 
-The dataset generation code has been written in Julia.
+The dataset generation code is written in Julia.
 
 1. The Julia code has been written for Julia 1.11.7. I recommend using [Juliaup](https://github.com/JuliaLang/juliaup) to manage installed versions of Julia.
 2. First enter the dataset generation code: `cd src/data_generation`
-3. Launch Julia and install dependencies: `julia --project-. --threads=8`
+3. Launch Julia and install dependencies: `julia --project=. --threads=<N>`
     ```julia
     ]instantiate
     ```
+    - The data generation is multithreaded, so make sure to add e.g. `--threads=8` to run on 8 threads.
     - If you get warnings about the manifest, or precompilation errors, check that you are using Julia 1.11.7
-4. Make sure that the directory `datasets/` exists at the project root, _not_ under `src/data_generation/`. Else, exporting the data will fail. (Note: the Python code does create folders if they are missing, so this is not an issue for other steps)
+4. Make sure that the directory `datasets/` exists at the project root, _not_ under `src/data_generation/`. Else, exporting the data will fail.
 5. Run `include("generate.jl")`. Now, the functions to generate the data sets are:
     - `generate_diffusion_dataset_1()`
     - `generate_diffusion_dataset_2()`
@@ -54,6 +54,7 @@ The dataset generation code has been written in Julia.
     - `generate_advdiff_low_peclet()`
     - `generate_advdiff_high_peclet()`
     - `generate_helmholtz()`
+6. To generate the 3D diffusion data set, run `include("diffusion3d/generate.jl"); generate_diffusion3d()`
 
 # Training the models
 
@@ -80,6 +81,8 @@ The results are stored in the `output/` folder, which will look as follows if al
     - `ngo/`
     - `rino/`
     - `varmion/`
+- `diffusion3d/`
+    - `ngo/`
 - `diffusion-dataset-1/`
     - `deeponet/`
     - `ngo/`
@@ -125,4 +128,5 @@ All the plots in the arXiv paper can be created by running the scripts in the `p
 python -m scripts.plotting.diffusion-precbars
 ```
 
-Note since PyPlot's `savefig` doesn't create subfolders that the `plots` directory exists and has subfolders `diffusion`, `advdiff`, and `helmholtz`.
+> [!important]
+> Before running the plotting scripts, make sure that the project root has a directory `plots/` with subfolders `diffusion/`, `advdiff/`, and `helmholtz/`. The scripts try to save figures in these subfolders, and PyPlot's `savefig` raises an error if the destination folder doesn't exist.
